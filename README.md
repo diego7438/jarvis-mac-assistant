@@ -2,6 +2,8 @@
 
 A personalized macOS assistant to automate your startup sequence, provide timely notifications, and add a bit of flair to your daily routine. Inspired by J.A.R.V.I.S. from Iron Man.
 
+**Created by Diego Anderson**, a high‑schooler with a deep passion for coding, automation, and ethical tech. Inspired by Iron Man’s J.A.R.V.I.S., this project reflects my drive to build systems that empower people while guarding their privacy.
+
 ## Features
 
 *   **Password Protected Startup:** Ensures only authorized access.
