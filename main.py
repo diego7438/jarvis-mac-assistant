@@ -7,6 +7,7 @@ from datetime import datetime
 import sys
 import threading
 import logging
+import requests # For fetching public IP
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -222,6 +223,29 @@ def main():
     time.sleep(1) # Pause before final greeting
     speak(f"Welcome home {user_name}. There are {days_left} days left in the year. Another day, another opportunity.", voice=voice_to_use)
     
+    # Offer to show user's public IP
+    logging.debug("Asking user if they want to see their public IP.")
+    ip_dialog_script = 'display dialog "Would you like to see your current public IP?" buttons {"Yes", "No"} default button "No" with title "Jarvis"'
+    ip_result = subprocess.run(["osascript", "-e", ip_dialog_script], capture_output=True, text=True)
+
+    if ip_result.returncode != 0:
+        logging.error(f"IP address dialog osascript error: {ip_result.stderr}")
+    elif "button returned:Yes" in ip_result.stdout:
+        logging.info("User chose to see public IP.")
+        try:
+            ip_address = requests.get('https://api.ipify.org', timeout=10).text
+            logging.debug(f"Fetched public IP: {ip_address}")
+            send_notification("Your IP Address", ip_address)
+            speak(f"Your public IP address is {ip_address}", voice=voice_to_use)
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Error fetching IP address: {e}")
+            speak("Sorry, I couldn't fetch your public IP address at the moment.", voice=voice_to_use)
+    elif "button returned:No" in ip_result.stdout:
+        logging.info("User chose not to see public IP.")
+        speak("Okay, I will not show your IP address.", voice=voice_to_use)
+    else:
+        logging.info("User cancelled IP address dialog or unknown button.")
+
     # Step 8: Hourly notifications begin
     logging.info(f"Sending initial notification and scheduling hourly check-ins...")
     send_notification("Jarvis", "Notifications will appear here every hour.")
@@ -229,6 +253,7 @@ def main():
     while True:
         schedule.run_pending()
         time.sleep(1)
+    
 
 if __name__ == "__main__":
     main()
