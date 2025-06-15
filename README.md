@@ -6,6 +6,9 @@ A personalized macOS assistant to automate your startup sequence, provide timely
 
 ## Features
 
+### Network Info Feature
+Optionally shows the user's current public IP address upon request—on‑demand and with explicit consent.
+
 *   **Password Protected Startup:** Ensures only authorized access.
 *   **Custom Startup Media:**
     *   Plays a configurable startup video (fullscreen with VLC, fallback to QuickTime).
