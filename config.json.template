@@ -1,0 +1,11 @@
+{
+  "user_name": "your_name_or_title",
+  "apps": ["Arc", "Spotify", "Visual Studio Code", "Notion"],
+  "folders": [],
+  "sound": "/path/to/your/sound.wav",
+  "startup_video_path": "/path/to/your/video.mp4",
+  "voice": null,
+  "reminder_message": "Time to stretch, genius.",
+  "reminder_interval_minutes": 60,
+  "hourly_checkin_message": "Hi {user_name}, it’s your assistant checking in. Have a productive day!"
+}
