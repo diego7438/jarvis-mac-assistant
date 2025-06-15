@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.env
+.venv
+env/
+venv/
+
+# macOS
+.DS_Store
+
+# Project specific
+config.json
+pause.flag
