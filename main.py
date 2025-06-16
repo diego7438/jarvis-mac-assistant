@@ -7,6 +7,7 @@ from datetime import datetime
 import sys
 import threading
 import logging
+import socket # For network check
 import requests # For fetching public IP
 
 # Configure logging
@@ -176,6 +177,17 @@ def load_config(config_path=CONFIG_FILE):
     with open(config_path, 'r') as f:
         return json.load(f)
 
+def check_internet_connection(host="8.8.8.8", port=53, timeout=3):
+    logging.debug(f"Checking internet connection to {host}:{port} with timeout {timeout}s.")
+    try:
+        socket.setdefaulttimeout(timeout)
+        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
+        logging.info("Internet connection check: Succeeded.")
+        return True
+    except socket.error as ex:
+        logging.warning(f"Internet connection check: Failed. Error: {ex}")
+        return False
+
 def main():
     logging.info("Main function started.")
     config = load_config()
@@ -188,10 +200,20 @@ def main():
     
     # Step 2: Ask for password
     if not ask_for_password():
-        speak("Access denied. Terminating session.", voice=voice_to_use)
+        speak("Incorrect passphrase. Unauthorized access attempt detected. Counter-measures initiated. We are coming for you.", voice=voice_to_use)
+        time.sleep(3) # Dramatic pause
         sys.exit()
     logging.info("Password correct.")
     time.sleep(1) # Pause after password success
+
+    # New: Network Connectivity Check (after successful password)
+    logging.info("Performing network connectivity check...")
+    if check_internet_connection():
+        speak("Network status: Connected and secure.", voice=voice_to_use)
+    else:
+        speak("Network status: Warning, unable to verify a secure internet connection. Proceeding with caution.", voice=voice_to_use)
+    time.sleep(1) # Pause after network check message
+
 
     # Step 3: Play startup video if configured
     video_path = config.get('startup_video_path')
