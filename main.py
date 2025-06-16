@@ -215,7 +215,7 @@ def check_internet_connection(host="8.8.8.8", port=53, timeout=3):
 # A small, curated list of OUIs to Manufacturer.
 # For a more comprehensive list, an external database or API would be needed.
 OUI_MANUFACTURERS = {
-    "00:03:93": "Apple", "00:05:02": "Apple", "00:10:FA": "Apple", "00:1A:11": "Apple",
+    "00:03:93": "Apple", "00:05:02": "Apple", "00:10:FA": "Apple", "00:1A:11": "Apple", # Covers Macs, iPhones, iPads, etc.
     "00:25:00": "Apple", "40:B0:34": "Apple", "7C:C3:A1": "Apple", "8C:85:90": "Apple",
     "00:14:51": "Netgear", "00:24:B2": "Netgear",
     "00:17:88": "Google", "F0:D5:BF": "Google", # Chromecast, Google Home/Nest
@@ -352,10 +352,9 @@ def main():
                 
                 manufacturer_details = []
                 for manu, count in manufacturers.items():
-                    # Only list "Unknown Manufacturer" if it's the only entry or all devices are unknown
-                    if manu != "Unknown Manufacturer" or (manu == "Unknown Manufacturer" and count == num_other_devices):
-                        manu_device_str = "device" if count == 1 else "devices"
-                        manufacturer_details.append(f"{count} {manu} {manu_device_str}")
+                    # Always include all manufacturer categories found in the spoken details
+                    manu_device_str = "device" if count == 1 else "devices"
+                    manufacturer_details.append(f"{count} {manu} {manu_device_str}")
                 if manufacturer_details:
                     scan_results_message += " This includes " + ", and ".join(manufacturer_details) + "."
                 speak(scan_results_message, voice=voice_to_use)
