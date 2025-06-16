@@ -9,6 +9,7 @@ import threading
 import logging
 import socket # For network check
 import requests # For fetching public IP
+import cv2 # For facial recognition
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -68,6 +69,28 @@ def ask_for_password():
             return password == "iron man"
     logging.debug("Password check failed or dialog cancelled.")
     return False
+
+def ask_for_name(expected_name="Diego"):
+    logging.debug(f"Asking for name, expecting '{expected_name}'...")
+    result = subprocess.run([
+        "osascript", "-e", # Changed prompt text
+        'display dialog "Please state your name to confirm identity:" default answer "" buttons {"Confirm"} default button 1 with title "Jarvis Identity Check"'
+    ], capture_output=True, text=True)
+
+    if result.returncode != 0:
+        logging.error(f"ask_for_name osascript error: {result.stderr}")
+        return False
+
+    logging.debug(f"ask_for_name stdout: {result.stdout}")
+    if "button returned:Confirm" in result.stdout:
+        answer_line = [line for line in result.stdout.splitlines() if "text returned:" in line]
+        if answer_line:
+            entered_name = answer_line[0].split("text returned:")[-1].strip()
+            logging.debug(f"Name entered: '{entered_name}'")
+            return entered_name.lower() == expected_name.lower()
+    logging.debug("Name check failed or dialog cancelled.")
+    return False
+
 
 def play_bootup_sound(sound_path):
     if sound_path and os.path.exists(sound_path):
@@ -188,17 +211,78 @@ def check_internet_connection(host="8.8.8.8", port=53, timeout=3):
         logging.warning(f"Internet connection check: Failed. Error: {ex}")
         return False
 
+def perform_facial_scan(voice_for_errors=None, duration_seconds=5):
+    logging.info("Attempting facial scan...")
+    face_cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+    if not os.path.exists(face_cascade_path):
+        logging.error(f"Haar cascade file not found at {face_cascade_path}. Facial scan cannot proceed.")
+        speak("Facial recognition module error. Cascade file missing.", voice=voice_for_errors)
+        return False # Or some other indicator of critical failure
+
+    face_cascade = cv2.CascadeClassifier(face_cascade_path)
+    cap = cv2.VideoCapture(0) # 0 is usually the default webcam
+
+    if not cap.isOpened():
+        logging.error("Cannot open webcam for facial scan.")
+        speak("Unable to access webcam for facial scan.", voice=voice_for_errors)
+        return False
+
+    logging.debug(f"Webcam opened. Scanning for faces for approx {duration_seconds} seconds.")
+    start_time = time.time()
+    face_detected = False
+
+    try:
+        while time.time() - start_time < duration_seconds:
+            ret, frame = cap.read()
+            if not ret:
+                logging.warning("Failed to capture frame from webcam.")
+                time.sleep(0.1) # Wait a bit before trying again or breaking
+                continue
+
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+
+            if len(faces) > 0:
+                logging.info("Face detected during scan.")
+                face_detected = True
+                break
+            time.sleep(0.1) # Small delay to reduce CPU usage and allow time for detection
+    finally:
+        cap.release()
+        logging.debug("Webcam released.")
+    return face_detected
+
 def main():
     logging.info("Main function started.")
     config = load_config()
     
     voice_to_use = config.get('voice')
     # Step 1: Show initial prompt
+    speak("Initiating identity verification sequence.", voice=voice_to_use)
+    time.sleep(1)
+
+    # Actual Facial Recognition
+    if perform_facial_scan(voice_for_errors=voice_to_use): # Corrected parameter name
+        speak("Facial scan successful. Primary user profile detected.", voice=voice_to_use)
+    else:
+        speak("Facial scan failed or no face detected. Access denied.", voice=voice_to_use)
+        time.sleep(2)
+        sys.exit()
+    time.sleep(1) # Pause after facial scan result
+
+    # Ask for Name (moved before password)
+    if not ask_for_name("Diego"): # Hardcoded name "Diego" as requested
+        speak("Name verification failed. Identity not confirmed. Access denied.", voice=voice_to_use)
+        time.sleep(3)
+        sys.exit()
+    logging.info("Name verification successful.")
+    time.sleep(1) # Pause after name success
+
     show_initial_prompt()
     logging.info("Initial prompt dialog acknowledged.")
     time.sleep(1) # Pause after initial prompt
     
-    # Step 2: Ask for password
+    # Ask for password
     if not ask_for_password():
         speak("Incorrect passphrase. Unauthorized access attempt detected. Counter-measures initiated. We are coming for you.", voice=voice_to_use)
         time.sleep(3) # Dramatic pause
@@ -237,13 +321,21 @@ def main():
     sound_thread.join()
     logging.debug("Sound thread joined.")
 
-    # Step 6: Final motivational greeting
+    # Step 6: Final motivational greeting with graduation countdown
     today = datetime.now()
-    days_left = (datetime(today.year, 12, 31) - today).days
+    graduation_date_str = "2026-05-29" # As requested
+    try:
+        graduation_date = datetime.strptime(graduation_date_str, "%Y-%m-%d")
+        days_until_graduation = (graduation_date - today).days
+        countdown_message = f"There are {days_until_graduation} days left until graduation on May 29, 2026."
+    except ValueError:
+        logging.error(f"Invalid graduation date format: {graduation_date_str}")
+        countdown_message = "Could not calculate days until graduation due to a date configuration error."
+
     user_name = config.get('user_name', 'sir') # Get user_name from config, default to 'sir'
     logging.debug(f"Speaking final greeting...")
     time.sleep(1) # Pause before final greeting
-    speak(f"Welcome home {user_name}. There are {days_left} days left in the year. Another day, another opportunity.", voice=voice_to_use)
+    speak(f"Welcome home {user_name}. {countdown_message} Another day, another opportunity.", voice=voice_to_use)
     
     # Offer to show user's public IP
     logging.debug("Asking user if they want to see their public IP.")

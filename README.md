@@ -13,7 +13,10 @@ Optionally shows the user's current public IP address upon request—on‑demand
 - **Public IP Address Display**: Optionally, Jarvis can fetch and display your current public IP address.
 - **Enhanced Security Feedback**: Incorrect password attempts trigger a (humorous) security alert.
 
-*   **Password Protected Startup:** Ensures only authorized access.
+*   **Multi-Factor Startup Security:**
+    *   Initiates with a basic facial detection scan using the webcam.
+    *   Requires a password for access.
+    *   Asks for name confirmation (e.g., "Diego") to proceed.
 *   **Custom Startup Media:**
     *   Plays a configurable startup video (fullscreen with VLC, fallback to QuickTime).
     *   Plays a configurable bootup sound.
@@ -22,9 +25,9 @@ Optionally shows the user's current public IP address upon request—on‑demand
     *   Opens a list of user-defined folders.
     *   Prompts for confirmation before opening general apps/folders.
     *   Separate, optional confirmation prompt for specific applications (e.g., Arc browser).
-*   **Personalized Greetings & Information:**
+*   **Personalized Greetings & Countdown:**
     *   Spoken welcome message with the user's configured name.
-    *   Displays the number of days left in the year.
+    *   Announces the number of days left until a specific target date (e.g., graduation).
 *   **Hourly Check-in Notifications:**
     *   Sends a desktop notification every hour with a customizable message.
     *   Notifications can be paused by creating a `pause.flag` file in the script's directory.
@@ -36,6 +39,7 @@ Optionally shows the user's current public IP address upon request—on‑demand
 *   macOS
 *   Python 3.x
 *   VLC Media Player (for optimal video playback). Make sure it's installed in `/Applications/VLC.app`. If it's elsewhere, you may need to adjust the path in `main.py`.
+*   Python libraries: `schedule`, `requests`, `opencv-python`.
 
 ## Setup
 
