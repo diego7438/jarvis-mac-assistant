@@ -9,6 +9,7 @@ import threading
 import logging
 import socket # For network check
 import requests # For fetching public IP
+import re # For MAC address pattern in network scan
 import cv2 # For facial recognition
 
 # Configure logging
@@ -211,6 +212,49 @@ def check_internet_connection(host="8.8.8.8", port=53, timeout=3):
         logging.warning(f"Internet connection check: Failed. Error: {ex}")
         return False
 
+# A small, curated list of OUIs to Manufacturer.
+# For a more comprehensive list, an external database or API would be needed.
+OUI_MANUFACTURERS = {
+    "00:03:93": "Apple", "00:05:02": "Apple", "00:10:FA": "Apple", "00:1A:11": "Apple",
+    "00:25:00": "Apple", "40:B0:34": "Apple", "7C:C3:A1": "Apple", "8C:85:90": "Apple",
+    "00:14:51": "Netgear", "00:24:B2": "Netgear",
+    "00:17:88": "Google", "F0:D5:BF": "Google", # Chromecast, Google Home/Nest
+    "3C:D9:2B": "Hewlett Packard", "00:0F:B5": "Hewlett Packard",
+    "70:3A:0E": "Amazon Technologies Inc.", "F0:27:2D": "Amazon Technologies Inc.", # Echo, Fire TV
+    "A8:5B:78": "Samsung Electronics", "00:16:DB": "Samsung Electronics",
+    "B8:27:EB": "Raspberry Pi Foundation",
+    "CC:46:D6": "Cisco", "00:0C:29": "VMware",
+    "D8:EB:97": "TP-LINK TECHNOLOGIES",
+}
+
+def get_network_device_info():
+    logging.debug("Attempting to get network device info using arp -a.")
+    try:
+        result = subprocess.run(["arp", "-a"], capture_output=True, text=True, check=False, timeout=10)
+        if result.returncode != 0:
+            logging.error(f"arp -a command failed. Stderr: {result.stderr}")
+            return 0, {} # Return zero devices and empty manufacturer dict
+
+        output_lines = result.stdout.splitlines()
+        manufacturers_found = {}
+        mac_pattern = re.compile(r"([0-9a-fA-F]{1,2}[:-]){5}([0-9a-fA-F]{1,2})")
+
+        for line in output_lines:
+            match = mac_pattern.search(line)
+            if match and "(incomplete)" not in line.lower():
+                mac_address = match.group(0)
+                oui_parts = [part.upper().zfill(2) for part in mac_address.split(':')[:3]]
+                oui = ":".join(oui_parts)
+                manufacturer = OUI_MANUFACTURERS.get(oui, "Unknown Manufacturer")
+                manufacturers_found[manufacturer] = manufacturers_found.get(manufacturer, 0) + 1
+
+        device_count = sum(manufacturers_found.values())
+        logging.info(f"Detected {device_count} other devices. Manufacturers: {manufacturers_found}")
+        return device_count, manufacturers_found
+    except (FileNotFoundError, subprocess.TimeoutExpired, Exception) as e:
+        logging.error(f"Error getting network device info: {e}")
+        return 0, {}
+
 def perform_facial_scan(voice_for_errors=None, duration_seconds=5):
     logging.info("Attempting facial scan...")
     face_cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
@@ -262,7 +306,8 @@ def main():
     time.sleep(1)
 
     # Actual Facial Recognition
-    if perform_facial_scan(voice_for_errors=voice_to_use): # Corrected parameter name
+    facial_scan_duration = config.get('facial_scan_duration_seconds', 5) # Default to 5 if not in config
+    if perform_facial_scan(voice_for_errors=voice_to_use, duration_seconds=facial_scan_duration):
         speak("Facial scan successful. Primary user profile detected.", voice=voice_to_use)
     else:
         speak("Facial scan failed or no face detected. Access denied.", voice=voice_to_use)
@@ -292,10 +337,28 @@ def main():
 
     # New: Network Connectivity Check (after successful password)
     logging.info("Performing network connectivity check...")
+    perform_scan = config.get("perform_network_scan", False) # Default to False if not in config
+
     if check_internet_connection():
-        speak("Network status: Connected and secure.", voice=voice_to_use)
+        speak_message = "Network status: Connected and secure."
+        if perform_scan:
+            num_other_devices, manufacturers = get_network_device_info()
+            if num_other_devices > 0:
+                device_str = "device" if num_other_devices == 1 else "devices"
+                speak_message += f" I've also detected {num_other_devices} other {device_str} on your local network."
+                
+                manufacturer_details = []
+                for manu, count in manufacturers.items():
+                    # Only list "Unknown Manufacturer" if it's the only entry or all devices are unknown
+                    if manu != "Unknown Manufacturer" or (manu == "Unknown Manufacturer" and count == num_other_devices):
+                        manu_device_str = "device" if count == 1 else "devices"
+                        manufacturer_details.append(f"{count} {manu} {manu_device_str}")
+                if manufacturer_details:
+                    speak_message += " This includes " + ", and ".join(manufacturer_details) + "."
+        speak(speak_message, voice=voice_to_use)
     else:
         speak("Network status: Warning, unable to verify a secure internet connection. Proceeding with caution.", voice=voice_to_use)
+
     time.sleep(1) # Pause after network check message
 
 

@@ -5,6 +5,7 @@ import os
 import sys
 from datetime import datetime
 import socket # For mocking network check
+import subprocess # For mocking subprocess.run specifically for network scan
 
 # Assuming test_main.py is in the same directory as main.py
 # If main.py is in a different location relative to this test file,
@@ -225,6 +226,70 @@ class TestJarvisAssistant(unittest.TestCase):
         mock_os_path_exists.assert_called_once_with(jarvis_main.PAUSE_FLAG)
         mock_send_notification.assert_not_called()
 
+    @patch('subprocess.run')
+    def test_get_network_device_info_success(self, mock_subprocess_run):
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = (
+            "? (192.168.1.1) at 00:1a:11:xx:xx:xx on en0 ifscope [ethernet]\n"
+            "? (192.168.1.100) at 70:3a:0e:yy:yy:yy on en0 ifscope [ethernet]\n"
+            "? (192.168.1.101) at aa:bb:cc:zz:zz:zz on en0 ifscope [ethernet]\n" # Unknown OUI
+            "? (192.168.1.255) at (incomplete) on en0 ifscope [ethernet]\n"
+        )
+        mock_subprocess_run.return_value = mock_result
+
+        count, manufacturers = jarvis_main.get_network_device_info()
+
+        mock_subprocess_run.assert_called_once_with(["arp", "-a"], capture_output=True, text=True, check=False, timeout=10)
+        self.assertEqual(count, 3)
+        self.assertEqual(manufacturers, {
+            "Apple": 1,
+            "Amazon Technologies Inc.": 1,
+            "Unknown Manufacturer": 1
+        })
+
+    @patch('subprocess.run')
+    def test_get_network_device_info_arp_command_fail(self, mock_subprocess_run):
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stderr = "arp command failed"
+        mock_subprocess_run.return_value = mock_result
+
+        count, manufacturers = jarvis_main.get_network_device_info()
+        self.assertEqual(count, 0)
+        self.assertEqual(manufacturers, {})
+
+    @patch('subprocess.run', side_effect=FileNotFoundError("arp not found"))
+    def test_get_network_device_info_arp_not_found(self, mock_subprocess_run):
+        count, manufacturers = jarvis_main.get_network_device_info()
+        self.assertEqual(count, 0)
+        self.assertEqual(manufacturers, {})
+
+    @patch('subprocess.run', side_effect=subprocess.TimeoutExpired(cmd="arp -a", timeout=5))
+    def test_get_network_device_info_timeout(self, mock_subprocess_run):
+        count, manufacturers = jarvis_main.get_network_device_info()
+        self.assertEqual(count, 0)
+        self.assertEqual(manufacturers, {})
+
+    @patch('subprocess.run')
+    def test_get_network_device_info_empty_output(self, mock_subprocess_run):
+        mock_result = MagicMock(returncode=0, stdout="")
+        mock_subprocess_run.return_value = mock_result
+        count, manufacturers = jarvis_main.get_network_device_info()
+        self.assertEqual(count, 0)
+        self.assertEqual(manufacturers, {})
+
+    @patch('subprocess.run')
+    def test_get_network_device_info_incomplete_only(self, mock_subprocess_run):
+        mock_result = MagicMock(returncode=0, stdout="? (192.168.1.255) at (incomplete) on en0 ifscope [ethernet]\n")
+        mock_subprocess_run.return_value = mock_result
+        count, manufacturers = jarvis_main.get_network_device_info()
+        self.assertEqual(count, 0)
+        self.assertEqual(manufacturers, {})
+
+
+
+
     @patch('socket.socket')
     def test_check_internet_connection_success(self, mock_socket_constructor):
         mock_socket_instance = MagicMock()
@@ -301,30 +366,36 @@ class TestJarvisAssistant(unittest.TestCase):
     @patch('main.ask_for_password')
     @patch('main.check_internet_connection')
     @patch('main.play_video_fullscreen')
+    @patch('main.get_network_device_info') # New patch
     @patch('threading.Thread')
     @patch('main.open_apps_and_folders')
     @patch('main.speak')
     @patch('main.send_notification')
     @patch('requests.get')
     @patch('schedule.every')
+    @patch('time.time', side_effect=[0, 0.1, 0.2, 0.3, 10]) # For facial scan loop
     @patch('time.sleep')
     @patch('sys.exit')
     @patch('subprocess.run')
-    def test_main_flow_access_granted(self, mock_subprocess_run_ip_dialog, mock_sys_exit, mock_time_sleep, mock_schedule_every,
+    def test_main_flow_access_granted(self, mock_subprocess_run_ip_dialog, mock_sys_exit, mock_time_sleep, mock_time_time, mock_schedule_every,
                                       mock_requests_get, mock_send_notification_main, mock_speak_main, mock_open_apps,
-                                      mock_thread_class, mock_play_video, mock_check_internet, mock_ask_password,
-                                      mock_show_initial_prompt, mock_ask_for_name, mock_perform_facial_scan, mock_load_config):
+                                      mock_thread_class, mock_get_network_device_info, mock_play_video, mock_check_internet,
+                                      mock_ask_password, mock_show_initial_prompt, mock_ask_for_name, mock_perform_facial_scan, mock_load_config):
+        # Note: mock_time_time is for perform_facial_scan, mock_time_sleep is for main loop
         mock_config_data = {
             "sound": "boot.wav", "apps": ["TestApp"], "folders": ["/test/folder"],
             "user_name": "Test User", "voice": "Daniel",
             "startup_video_path": "/path/to/video.mp4",
-            "hourly_checkin_message": "Hourly check for {user_name}"
+            "hourly_checkin_message": "Hourly check for {user_name}",
+            "perform_network_scan": True, # Enable network scan for this test
+            "facial_scan_duration_seconds": 0.2 # Short duration for test
         }
         mock_load_config.return_value = mock_config_data
         mock_perform_facial_scan.return_value = True
         mock_ask_for_name.return_value = True
         mock_ask_password.return_value = True
         mock_check_internet.return_value = True
+        mock_get_network_device_info.return_value = (2, {"Apple": 1, "Google": 1}) # Mock network scan result
 
         mock_thread_instance = MagicMock()
         mock_thread_instance.is_alive.return_value = False
@@ -351,11 +422,12 @@ class TestJarvisAssistant(unittest.TestCase):
             jarvis_main.main()
 
         mock_load_config.assert_called_once()
-        mock_perform_facial_scan.assert_called_once_with(voice_for_errors=mock_config_data['voice'])
+        mock_perform_facial_scan.assert_called_once_with(voice_for_errors=mock_config_data['voice'], duration_seconds=mock_config_data['facial_scan_duration_seconds'])
         mock_ask_for_name.assert_called_once_with("Diego")
         mock_show_initial_prompt.assert_called_once()
         mock_ask_password.assert_called_once()
         mock_check_internet.assert_called_once()
+        mock_get_network_device_info.assert_called_once() # Verify network scan is called
         mock_play_video.assert_called_once_with(mock_config_data['startup_video_path'], mock_config_data['voice'])
         mock_thread_class.assert_called_once_with(target=jarvis_main.play_bootup_sound, args=(mock_config_data.get('sound'),))
         mock_open_apps.assert_called_once_with(mock_config_data, sound_thread_to_start=mock_thread_instance)
@@ -364,7 +436,8 @@ class TestJarvisAssistant(unittest.TestCase):
         speak_calls = mock_speak_main.call_args_list
         self.assertIn(call("Initiating identity verification sequence.", voice="Daniel"), speak_calls)
         self.assertIn(call("Facial scan successful. Primary user profile detected.", voice="Daniel"), speak_calls)
-        self.assertIn(call("Network status: Connected and secure.", voice="Daniel"), speak_calls)
+        expected_network_speak_message = "Network status: Connected and secure. I've also detected 2 other devices on your local network. This includes 1 Apple device, and 1 Google device."
+        self.assertIn(call(expected_network_speak_message, voice="Daniel"), speak_calls)
         today = datetime.now()
         graduation_date = datetime.strptime("2026-05-29", "%Y-%m-%d")
         days_until_graduation = (graduation_date - today).days
@@ -389,10 +462,10 @@ class TestJarvisAssistant(unittest.TestCase):
     @patch('time.sleep')
     @patch('threading.Thread')
     @patch('main.open_apps_and_folders')
-    def test_main_flow_password_denied(self, mock_open_apps, mock_thread_class, mock_time_sleep_denied, mock_sys_exit,
+    def test_main_flow_password_denied(self, mock_open_apps, mock_thread_class, mock_time_sleep, mock_sys_exit,
                                      mock_speak_main, mock_ask_password, mock_show_initial_prompt, mock_ask_name,
                                      mock_perform_facial_scan, mock_load_config):
-        mock_load_config.return_value = {"voice": "Ava"}
+        mock_load_config.return_value = {"voice": "Ava", "facial_scan_duration_seconds": 5}
         mock_perform_facial_scan.return_value = True
         mock_ask_name.return_value = True
         mock_ask_password.return_value = False
@@ -401,13 +474,13 @@ class TestJarvisAssistant(unittest.TestCase):
 
         mock_load_config.assert_called_once()
         mock_speak_main.assert_any_call("Initiating identity verification sequence.", voice="Ava")
-        mock_perform_facial_scan.assert_called_once_with(voice_for_errors="Ava")
+        mock_perform_facial_scan.assert_called_once_with(voice_for_errors="Ava", duration_seconds=5)
         mock_speak_main.assert_any_call("Facial scan successful. Primary user profile detected.", voice="Ava")
         mock_ask_name.assert_called_once_with("Diego")
         mock_show_initial_prompt.assert_called_once()
         mock_ask_password.assert_called_once()
         mock_speak_main.assert_any_call("Incorrect passphrase. Unauthorized access attempt detected. Counter-measures initiated. We are coming for you.", voice="Ava")
-        mock_time_sleep_denied.assert_any_call(3)
+        mock_time_sleep.assert_any_call(3) # Check for the specific sleep after denial
         mock_sys_exit.assert_called_once_with()
         mock_thread_class.assert_not_called()
         mock_open_apps.assert_not_called()
@@ -422,14 +495,14 @@ class TestJarvisAssistant(unittest.TestCase):
     @patch('time.sleep')
     def test_main_flow_name_denied(self, mock_time_sleep, mock_sys_exit, mock_speak, mock_ask_password,
                                  mock_show_prompt, mock_ask_name, mock_perform_facial_scan, mock_load_config):
-        mock_load_config.return_value = {"voice": "Zarvox"}
+        mock_load_config.return_value = {"voice": "Zarvox", "facial_scan_duration_seconds": 5}
         jarvis_main.main()
 
-        mock_perform_facial_scan.assert_called_once_with(voice_for_errors="Zarvox")
+        mock_perform_facial_scan.assert_called_once_with(voice_for_errors="Zarvox", duration_seconds=5)
         mock_ask_name.assert_called_once_with("Diego")
         mock_ask_password.assert_not_called()
         mock_speak.assert_any_call("Name verification failed. Identity not confirmed. Access denied.", voice="Zarvox")
-        mock_time_sleep.assert_any_call(3)
+        mock_time_sleep.assert_any_call(3) # Check for the specific sleep after denial
         mock_sys_exit.assert_called_once_with()
         mock_show_prompt.assert_not_called() # Should not be called if name fails
 
@@ -444,10 +517,10 @@ class TestJarvisAssistant(unittest.TestCase):
     def test_main_flow_facial_scan_denied(self, mock_ask_password, mock_show_initial_prompt, mock_ask_name,
                                           mock_time_sleep, mock_sys_exit, mock_speak,
                                           mock_perform_facial_scan, mock_load_config):
-        mock_load_config.return_value = {"voice": "Tom"}
+        mock_load_config.return_value = {"voice": "Tom", "facial_scan_duration_seconds": 5}
         jarvis_main.main()
 
-        mock_perform_facial_scan.assert_called_once_with(voice_for_errors="Tom")
+        mock_perform_facial_scan.assert_called_once_with(voice_for_errors="Tom", duration_seconds=5)
         mock_speak.assert_any_call("Facial scan failed or no face detected. Access denied.", voice="Tom")
         mock_sys_exit.assert_called_once_with()
         mock_ask_name.assert_not_called()

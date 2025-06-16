@@ -18,6 +18,7 @@ Optionally shows the user's current public IP address upon request—on‑demand
     *   Requires a password for access.
     *   Asks for name confirmation (e.g., "Diego") to proceed.
 *   **Custom Startup Media:**
+    *   **Local Network Device Scan**: (Optional) Scans the local network using `arp -a` to identify the number of other devices and attempts to identify their manufacturers based on MAC address OUIs. This is reported verbally after the internet check.
     *   Plays a configurable startup video (fullscreen with VLC, fallback to QuickTime).
     *   Plays a configurable bootup sound.
 *   **Automated Application & Folder Launching:**
@@ -62,6 +63,7 @@ Optionally shows the user's current public IP address upon request—on‑demand
         *   `startup_video_path`: Absolute path to your desired startup video file.
         *   `voice`: (Optional) The name of a macOS voice to use for spoken messages (e.g., "Alex", "Daniel"). Leave as `null` for the default voice.
         *   `hourly_checkin_message`: The template for your hourly notification. Use `{user_name}` as a placeholder for your configured user name.
+        *   `perform_network_scan`: (Optional, boolean) Set to `true` to enable scanning for other devices on the local network during startup. Defaults to `false` if not present.
 
 3.  **Ensure VLC is installed:**
     For the best experience with the startup video, install VLC from videolan.org and ensure it's in your `/Applications` folder.
