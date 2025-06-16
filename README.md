@@ -9,6 +9,10 @@ A personalized macOS assistant to automate your startup sequence, provide timely
 ### Network Info Feature
 Optionally shows the user's current public IP address upon request—on‑demand and with explicit consent.
 
+- **Network Status Check**: Upon successful login, Jarvis verifies internet connectivity and announces the status.
+- **Public IP Address Display**: Optionally, Jarvis can fetch and display your current public IP address.
+- **Enhanced Security Feedback**: Incorrect password attempts trigger a (humorous) security alert.
+
 *   **Password Protected Startup:** Ensures only authorized access.
 *   **Custom Startup Media:**
     *   Plays a configurable startup video (fullscreen with VLC, fallback to QuickTime).
