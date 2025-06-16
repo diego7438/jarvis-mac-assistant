@@ -63,6 +63,7 @@ Optionally shows the user's current public IP address upon request—on‑demand
         *   `startup_video_path`: Absolute path to your desired startup video file.
         *   `voice`: (Optional) The name of a macOS voice to use for spoken messages (e.g., "Alex", "Daniel"). Leave as `null` for the default voice.
         *   `hourly_checkin_message`: The template for your hourly notification. Use `{user_name}` as a placeholder for your configured user name.
+        *   `facial_scan_duration_seconds`: (Optional) Number of seconds the facial scan will attempt to detect a face. Defaults to 5 seconds if not present.
         *   `perform_network_scan`: (Optional, boolean) Set to `true` to enable scanning for other devices on the local network during startup. Defaults to `false` if not present.
 
 3.  **Ensure VLC is installed:**

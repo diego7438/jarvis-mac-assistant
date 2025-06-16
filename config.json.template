@@ -1,11 +1,11 @@
 {
   "user_name": "your_name_or_title",
   "apps": ["Arc", "Spotify", "Visual Studio Code", "Notion"],
-  "folders": [],
+  "folders": ["/path/to/your/folder1", "/path/to/your/folder2"],
   "sound": "/path/to/your/sound.wav",
   "startup_video_path": "/path/to/your/video.mp4",
-  "voice": null,
-  "reminder_message": "Time to stretch, genius.",
-  "reminder_interval_minutes": 60,
-  "hourly_checkin_message": "Hi {user_name}, it’s your assistant checking in. Have a productive day!"
+  "voice": "Daniel",
+  "hourly_checkin_message": "Hi {user_name}, it’s your assistant checking in. Have a productive day!",
+  "facial_scan_duration_seconds": 5,
+  "perform_network_scan": false
 }

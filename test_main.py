@@ -436,8 +436,11 @@ class TestJarvisAssistant(unittest.TestCase):
         speak_calls = mock_speak_main.call_args_list
         self.assertIn(call("Initiating identity verification sequence.", voice="Daniel"), speak_calls)
         self.assertIn(call("Facial scan successful. Primary user profile detected.", voice="Daniel"), speak_calls)
-        expected_network_speak_message = "Network status: Connected and secure. I've also detected 2 other devices on your local network. This includes 1 Apple device, and 1 Google device."
-        self.assertIn(call(expected_network_speak_message, voice="Daniel"), speak_calls)
+        # Updated assertions for network speak calls
+        self.assertIn(call("Network status: Connected and secure.", voice="Daniel"), speak_calls)
+        self.assertIn(call("Identifying what other devices are connected to your network.", voice="Daniel"), speak_calls)
+        expected_scan_results_message = "I've detected 2 other devices on your local network. This includes 1 Apple device, and 1 Google device."
+        self.assertIn(call(expected_scan_results_message, voice="Daniel"), speak_calls)
         today = datetime.now()
         graduation_date = datetime.strptime("2026-05-29", "%Y-%m-%d")
         days_until_graduation = (graduation_date - today).days

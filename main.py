@@ -340,12 +340,15 @@ def main():
     perform_scan = config.get("perform_network_scan", False) # Default to False if not in config
 
     if check_internet_connection():
-        speak_message = "Network status: Connected and secure."
+        speak("Network status: Connected and secure.", voice=voice_to_use)
         if perform_scan:
+            speak("Identifying what other devices are connected to your network.", voice=voice_to_use)
+            time.sleep(0.5) # Brief pause for natural flow
+
             num_other_devices, manufacturers = get_network_device_info()
             if num_other_devices > 0:
                 device_str = "device" if num_other_devices == 1 else "devices"
-                speak_message += f" I've also detected {num_other_devices} other {device_str} on your local network."
+                scan_results_message = f"I've detected {num_other_devices} other {device_str} on your local network."
                 
                 manufacturer_details = []
                 for manu, count in manufacturers.items():
@@ -354,8 +357,10 @@ def main():
                         manu_device_str = "device" if count == 1 else "devices"
                         manufacturer_details.append(f"{count} {manu} {manu_device_str}")
                 if manufacturer_details:
-                    speak_message += " This includes " + ", and ".join(manufacturer_details) + "."
-        speak(speak_message, voice=voice_to_use)
+                    scan_results_message += " This includes " + ", and ".join(manufacturer_details) + "."
+                speak(scan_results_message, voice=voice_to_use)
+            # If num_other_devices is 0, no specific message is spoken about scan results,
+            # which is consistent with previous behavior where the original speak_message wouldn't be appended to.
     else:
         speak("Network status: Warning, unable to verify a secure internet connection. Proceeding with caution.", voice=voice_to_use)
 
